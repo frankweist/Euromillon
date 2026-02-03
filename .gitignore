@@ -1,0 +1,6 @@
+node_modules/
+playwright-report/
+.env
+**/coverage
+tests/
+test-results/

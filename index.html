@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Peña Euromillones</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">€</div>
+        <div>
+          <div class="title">Peña Euromillones</div>
+          <div class="subtitle">Control de participantes · pagos · sorteos</div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <button type="button" class="btn btn-ghost" id="btnExportJson" title="Exportar datos">
+          Exportar
+        </button>
+        <button type="button" class="btn btn-ghost" id="btnImportJson" title="Importar datos">
+          Importar
+        </button>
+        <input type="file" id="fileImport" accept="application/json" hidden />
+        <button
+          type="button"
+          class="btn btn-danger"
+          id="btnResetAll"
+          title="Borrar todos los datos"
+        >
+          Reset
+        </button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="tabs">
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="participantes">Participantes</button>
+        <button class="tab" data-tab="pagos">Pagos</button>
+        <button class="tab" data-tab="sorteos">Sorteos</button>
+        <button class="tab" data-tab="resultados">Resultados</button>
+        <button class="tab" data-tab="ajustes">Ajustes</button>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section class="panel active" id="tab-dashboard">
+        <div class="grid">
+          <div class="card">
+            <div class="card-header">
+              <h2>Estado rápido</h2>
+            </div>
+            <div class="card-body">
+              <div class="kpis">
+                <div class="kpi">
+                  <div class="kpi-label">Participantes activos</div>
+                  <div class="kpi-value" id="kpiActivos">0</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">Mes en curso</div>
+                  <div class="kpi-value" id="kpiMes">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">Pagados (mes)</div>
+            <tfoot>
+              <tr>
+                <td colspan="6" style="text-align:right;">Saldo en cuenta:</td>
+                <td id="paySaldoTotal" style="font-weight:bold;"></td>
+              </tr>
+              <tr>
+                <td colspan="7">
+                  <div id="payResumenMovimientos" style="margin-top:8px;font-size:0.95em;"></div>
+                </td>
+              </tr>
+            </tfoot>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="row">
+                <div>
+                  <div class="muted">Coste por apuesta simple (España)</div>
+                  <div class="big" id="dashCosteApuesta">2,50 €</div>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="row">
+                <div class="grow">
+                  <div class="muted">Próximo sorteo</div>
+                  <div class="big" id="dashProximoSorteo">—</div>
+                  <div class="muted" id="dashProximoInfo">—</div>
+                </div>
+                <div class="stack">
+                  <button type="button" class="btn btn-primary" id="btnIrSorteo">
+                    Ir a Sorteo
+                  </button>
+                  <button type="button" class="btn btn-ghost" id="btnExportCsv">
+                    Exportar CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Quién juega hoy (según pagos)</h2>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="grow">
+                  <label class="label" for="dashFechaSorteo">Fecha del sorteo</label>
+                  <input class="input" type="date" id="dashFechaSorteo" />
+                </div>
+                <div class="grow">
+                  <label class="label" for="dashDiaSorteo">Día</label>
+                  <select class="select" id="dashDiaSorteo">
+                    <option value="martes">Martes</option>
+                    <option value="viernes">Viernes</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grow">
+                <label class="label" for="dashPayMonth">Mes de pago (referencia)</label>
+                <input class="input" type="month" id="dashPayMonth" />
+              </div>
+              <div class="divider"></div>
+
+              <div class="row">
+                <div class="grow">
+                  <div class="muted">Jugadores elegibles</div>
+                  <div class="big" id="dashElegiblesCount">0</div>
+                </div>
+                <div class="grow">
+                  <div class="muted">Total € (según elegibles)</div>
+                  <div class="big" id="dashTotalEuros">0,00 €</div>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div id="dashElegiblesList" class="chips"></div>
+
+              <div class="divider"></div>
+
+              <div class="row">
+                <button type="button" class="btn btn-primary" id="btnCrearSorteoDesdeDashboard">
+                  Crear sorteo con estos jugadores
+                </button>
+              </div>
+
+              <p class="hint">
+                Regla aplicada: activo + pagado en el mes + (juega martes/viernes según su
+                preferencia).
+              </p>
+            </div>
+          </div>
+
+          <!-- Últimos números jugados debajo del próximo sorteo -->
+          <div style="margin-top: 18px;">
+            <div class="muted" style="font-weight:600;">Últimos números jugados</div>
+            <div id="dashUltimosJugados">
+              <div class="muted">No hay apuestas registradas aún.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Últimos resultados</h2>
+            </div>
+            <div class="card-body">
+              <div id="dashUltimosResultados">
+                <div class="muted">No hay resultados registrados aún.</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- PARTICIPANTES -->
+      <section class="panel" id="tab-participantes">
+        <div class="card">
+          <div class="card-header">
+            <h2>Participantes</h2>
+            <div class="card-actions">
+              <button type="button" class="btn btn-primary" id="btnAddParticipante">Añadir</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="grow">
+                <label class="label">Buscar</label>
+                <input class="input" id="pSearch" placeholder="Nombre..." />
+              </div>
+              <div class="grow">
+                <label class="label">Filtro</label>
+                <select class="select" id="pFilter">
+                  <option value="todos">Todos</option>
+                  <option value="activos">Activos</option>
+                  <option value="inactivos">Inactivos</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="table" id="pTable">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Preferencia</th>
+                    <th>Activo</th>
+                    <th>Notas</th>
+                    <th class="right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="pTbody"></tbody>
+              </table>
+            </div>
+
+            <p class="hint">
+              Preferencia: martes/viernes/ambos. Se usa para calcular quién juega en cada sorteo.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGOS -->
+      <section class="panel" id="tab-pagos">
+        <div class="card">
+          <div class="card-header">
+            <h2>Pagos mensuales</h2>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="grow">
+                <label class="label" for="payMonth">Mes</label>
+                <input class="input" type="month" id="payMonth" />
+              </div>
+              <div class="grow">
+                <label class="label">Aplicar a todos (pendientes)</label>
+                <button type="button" class="btn btn-ghost" id="btnMarkAllUnpaid">
+                  Marcar todos como NO pagado
+                </button>
+                <button type="button" class="btn btn-ghost" id="btnMarkAllPaid">
+                  Marcar todos como pagado
+                </button>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="table-wrap">
+              <table class="table" id="payTable">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Activo</th>
+                    <th>Pagado</th>
+                    <th>Fecha pago</th>
+                    <th>Medio</th>
+                    <th>Notas</th>
+                    <th>Importe pagado</th>
+                    <th>Saldo en cuenta</th>
+                  </tr>
+                </thead>
+                <tbody id="payTbody"></tbody>
+              </table>
+            </div>
+
+            <p class="hint">
+              La web usa el mes seleccionado para determinar quién juega en cada sorteo.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SORTEOS -->
+      <section class="panel" id="tab-sorteos">
+        <div class="grid">
+          <div class="card">
+            <div class="card-header">
+              <h2>Crear sorteo</h2>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="grow">
+                  <label class="label" for="drawDate">Fecha</label>
+                  <input class="input" type="date" id="drawDate" />
+                </div>
+                <div class="grow">
+                  <label class="label" for="drawDay">Día</label>
+                  <select class="select" id="drawDay">
+                    <option value="martes">Martes</option>
+                    <option value="viernes">Viernes</option>
+                  </select>
+                </div>
+                <div class="grow">
+                  <label class="label" for="drawPayMonth">Mes de pago a aplicar</label>
+                  <input class="input" type="month" id="drawPayMonth" />
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="row">
+                <div class="grow">
+                  <div class="muted">Elegibles (activo + pagado + preferencia)</div>
+                  <div class="big" id="drawEligibleCount">0</div>
+                </div>
+                <div class="grow">
+                  <div class="muted">Total € (según elegibles)</div>
+                  <div class="big" id="drawTotalEuros">0,00 €</div>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="row">
+                <div class="grow">
+                  <label class="label">Nota / referencia resguardo (opcional)</label>
+                  <input
+                    class="input"
+                    id="drawTicketNote"
+                    placeholder="Ej: Admin X, 2 simples + múltiple 6n2e..."
+                  />
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="row">
+                <button type="button" class="btn btn-primary" id="btnCreateDraw">
+                  Crear sorteo
+                </button>
+                <button type="button" class="btn btn-ghost" id="btnPreviewEligible">
+                  Ver lista elegibles
+                </button>
+              </div>
+
+              <div id="eligiblePreview" class="chips"></div>
+
+              <p class="hint">
+                Se crea un sorteo con la lista de jugadores calculada automáticamente. Puedes
+                ajustar luego en el detalle.
+              </p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Histórico de sorteos</h2>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="grow">
+                  <label class="label">Buscar</label>
+                  <input class="input" id="drawSearch" placeholder="Fecha, nota..." />
+                </div>
+                <div class="grow">
+                  <label class="label">Filtrar</label>
+                  <select class="select" id="drawFilter">
+                    <option value="todos">Todos</option>
+                    <option value="pendientes">Pendientes de resguardo</option>
+                    <option value="enviados">Resguardo enviado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div id="drawList" class="list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RESULTADOS -->
+      <section class="panel" id="tab-resultados">
+        <div class="card">
+          <div class="card-header">
+            <h2>Resultados</h2>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="grow">
+                <label class="label">Buscar</label>
+                <input class="input" id="resSearch" placeholder="Fecha, premio..." />
+              </div>
+              <div class="grow">
+                <label class="label">Filtrar</label>
+                <select class="select" id="resFilter">
+                  <option value="todos">Todos</option>
+                  <option value="conPremio">Con premio</option>
+                  <option value="sinPremio">Sin premio</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div id="resList" class="list"></div>
+
+            <p class="hint">
+              En el detalle de cada sorteo puedes registrar el premio total y una nota de reparto
+              (bote, reparto, etc.).
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- AJUSTES -->
+      <section class="panel" id="tab-ajustes">
+        <div class="grid">
+          <div class="card">
+            <div class="card-header">
+              <h2>Ajustes Generales</h2>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="grow">
+                  <label class="label" for="cfgCosteApuesta">Coste apuesta simple (€)</label>
+                  <input class="input" type="number" min="0" step="0.01" id="cfgCosteApuesta" />
+                </div>
+                <div class="grow">
+                  <label class="label" for="cfgMensualSugerido">Pago mensual sugerido (€)</label>
+                  <input class="input" type="number" min="0" step="0.01" id="cfgMensualSugerido" />
+                </div>
+              </div>
+              <div style="margin-top: 15px">
+                <label class="label" for="cfgNextDrawWeeks"
+                  >Semanas a buscar para "Próximo sorteo"</label
+                >
+                <input
+                  class="input"
+                  type="number"
+                  id="cfgNextDrawWeeks"
+                  min="0"
+                  step="1"
+                  style="width: 100px"
+                />
+                <div style="margin-top: 8px">
+                  <label class="label">Días a considerar</label>
+                  <div style="display: flex; gap: 10px; align-items: center">
+                    <label><input type="checkbox" id="cfgDayMartes" /> Martes</label>
+                    <label><input type="checkbox" id="cfgDayViernes" /> Viernes</label>
+                  </div>
+                </div>
+                <div style="margin-top: 12px">
+                  <button type="button" class="btn btn-primary" id="btnSaveCfg">
+                    Guardar ajustes
+                  </button>
+                </div>
+
+                <div style="margin-top: 15px">
+                  <label class="label" for="cfgProxyUrl">Proxy de resultados (opcional)</label>
+                  <input class="input" id="cfgProxyUrl" placeholder="https://mi-dominio.com/fetch" />
+                  <label class="label" for="cfgProxyKey">Clave del proxy (opcional)</label>
+                  <input class="input" id="cfgProxyKey" placeholder="token-secreto" />
+                  <p class="hint">Si configuras un proxy, la app intentará obtener resultados desde esa URL en lugar de acceder directamente a TuLotero (evita problemas CORS).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Mis Apuestas Fijas</h2>
+            </div>
+            <div class="card-body">
+              <div id="listaApuestasFijas" class="stack" style="margin-bottom: 15px"></div>
+              <div class="divider"></div>
+              <div class="row">
+                <input
+                  type="text"
+                  class="input grow"
+                  id="inFijaNums"
+                  placeholder="5 números (ej: 1,12,23,34,45)"
+                />
+                <input
+                  type="text"
+                  class="input"
+                  style="width: 100px"
+                  id="inFijaEsts"
+                  placeholder="2 estrellas"
+                />
+                <button type="button" class="btn btn-primary" id="btnAddFija">Añadir</button>
+              </div>
+              <p class="hint">
+                Estas apuestas se usarán para comprobar todos los sorteos automáticamente.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- MODAL -->
+    <div class="modal" id="modal" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="modalTitle">—</h3>
+          <button type="button" class="icon-btn" id="modalClose" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-footer" id="modalFooter"></div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="muted">Local: no envía datos a Internet · Exporta JSON para copias.</div>
+    <div class="muted">Pruebas: `tests/e2e/smoke.spec.ts` (smoke) y `tests/e2e/full.spec.ts` (completo). Ver `TESTING.md` para más detalles.</div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

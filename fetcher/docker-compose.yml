@@ -1,0 +1,11 @@
+services:
+  tulotero-proxy:
+    build: .
+    image: tulotero-proxy:local
+    ports:
+      - "3003:3003"
+    environment:
+      - PROXY_KEY=317a50fc-5772-498c-9c4b-fe9acbffed6e
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - CACHE_TTL=${CACHE_TTL:-600}
+    restart: unless-stopped
