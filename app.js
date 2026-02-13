@@ -72,8 +72,8 @@ function renderDashboard() {
       if (p) {
         const chip = document.createElement('div');
         chip.className = 'chip';
-      utils.$('#dashCosteApuesta').textContent = utils.euro(state.config.costeApuesta);
-      utils.$('#dashMensualSugerido').textContent = utils.euro(state.config.mensualSugerido);
+        chip.textContent = p.nombre;
+        list.appendChild(chip);
       }
     });
 
@@ -308,9 +308,6 @@ function renderPagos() {
   const tbody = utils.$('#payTbody');
   tbody.innerHTML = '';
 
-  // Calcular saldo total en cuenta (sumar todos los pagos, restar jugadas y sumar premios)
-  let saldoTotal = 0;
-  const meses = Object.keys(state.pagos).sort();
   // Mostrar tabla de pagos por participante
   state.participantes
     .sort((a, b) => a.nombre.localeCompare(b.nombre))
@@ -319,11 +316,7 @@ function renderPagos() {
       try {
         // Cantidad pagada este mes (editable)
         let cantidadPagada = entry && typeof entry.cantidad === 'number' ? entry.cantidad : 0;
-        // Sumar a saldo total todos los pagos de todos los meses
-        meses.forEach((m) => {
-          const e = state.pagos[m]?.entries?.[p.id];
-          if (e && typeof e.cantidad === 'number') saldoTotal += e.cantidad;
-        });
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
                 <td>${utils.escapeHtml(p.nombre)}</td>
@@ -384,15 +377,38 @@ function renderPagos() {
       }
     });
 
-  // Restar jugadas y sumar premios al saldo total
-  (state.sorteos || []).forEach((s) => {
-    if (Array.isArray(s.jugadores)) saldoTotal -= (s.jugadores.length || 0) * (state.config.costeApuesta || 2.5);
-    if (s.resultados && s.resultados.totalDistributed) saldoTotal += s.resultados.totalDistributed;
-  });
+  // Usar la nueva función de contabilidad centralizada
+  const accounting = logic.calculateAccounting(state);
 
-  // Mostrar saldo total en el pie de la tabla
-  const saldoTotalCell = utils.$('#paySaldoTotal');
-  if (saldoTotalCell) saldoTotalCell.textContent = utils.euro(saldoTotal);
+  // Mostrar resumen de movimientos en una tarjeta (card) más visual
+  const resumenDiv = utils.$('#payResumenMovimientos');
+  if (resumenDiv) {
+    resumenDiv.innerHTML = `
+      <div class="card" style="margin-top: 20px;">
+        <div class="card-header"><h3>Resumen de Contabilidad</h3></div>
+        <div class="card-body">
+          <div class="kpi-grid">
+            <div class="kpi-item">
+              <div class="kpi-value" style="color:var(--accent2);">${utils.euro(accounting.totalIncome)}</div>
+              <div class="kpi-label">Ingresos Totales</div>
+            </div>
+            <div class="kpi-item">
+              <div class="kpi-value" style="color:var(--danger);">${utils.euro(accounting.totalExpenses)}</div>
+              <div class="kpi-label">Gastos en Apuestas</div>
+            </div>
+            <div class="kpi-item">
+              <div class="kpi-value" style="color:var(--accent);">${utils.euro(accounting.totalPrizes)}</div>
+              <div class="kpi-label">Premios Recibidos</div>
+            </div>
+            <div class="kpi-item">
+              <div class="kpi-value">${utils.euro(accounting.balance)}</div>
+              <div class="kpi-label">Saldo en Cuenta</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 }
 /* ---------------- SORTEOS ---------------- */
 function renderSorteos() {
@@ -457,63 +473,68 @@ function openDrawDetail(drawId) {
   let apuestasHtml = '';
   if (apuestasFijas.length === 0 && apuestasNormales.length === 0) {
     apuestasHtml = `<div class="muted">No hay apuestas registradas para este sorteo.<br>Puedes añadirlas usando los botones de abajo.</div>`;
+  } else {
+    if (apuestasFijas.length > 0) {
+      apuestasHtml += '<div class="item-sub">Fijas:</div>';
+      apuestasHtml += apuestasFijas.map((ap, idx) => `<div class="item">#${idx + 1}: ${ap.numeros.join(', ')} | Estrellas: ${ap.estrellas.join(', ')} <button class="btn-danger-sm ap-remove" data-sid="${s.id}" data-apid="${ap.id}">✕</button></div>`).join('');
+    }
+    if (apuestasNormales.length > 0) {
+      apuestasHtml += '<div class="item-sub">Normales:</div>';
+      apuestasHtml += apuestasNormales.map((ap, idx) => `<div class="item">#${idx + 1}: ${ap.numeros.join(', ')} | Estrellas: ${ap.estrellas.join(', ')} <button class="btn-danger-sm ap-remove" data-sid="${s.id}" data-apid="${ap.id}">✕</button></div>`).join('');
+    }
   }
 
-  // Calcular dinero entrado, salido y saldo
-  let dineroEntrado = 0;
-  let dineroSalido = 0;
-  let saldoTotal = 0;
-  const meses = Object.keys(state.pagos).sort();
-  // Mostrar tabla de pagos por participante
-  state.participantes
-    .sort((a, b) => a.nombre.localeCompare(b.nombre))
-    .forEach((p) => {
-      const entry = state.pagos[month].entries[p.id];
-      try {
-        // Cantidad pagada este mes (editable)
-        let cantidadPagada = entry && typeof entry.cantidad === 'number' ? entry.cantidad : 0;
-        // Sumar a dineroEntrado todos los pagos de todos los meses
-        meses.forEach((m) => {
-          const e = state.pagos[m]?.entries?.[p.id];
-          if (e && typeof e.cantidad === 'number') dineroEntrado += e.cantidad;
-        });
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-                <td>${utils.escapeHtml(p.nombre)}</td>
-                <td>${p.activo ? 'Sí' : 'No'}</td>
-                <td><select class="select sel-pagado"><option value="true" ${entry && entry.pagado ? 'selected' : ''}>Sí</option><option value="false" ${!entry || !entry.pagado ? 'selected' : ''}>No</option></select></td>
-                <td><input type="date" class="input inp-fecha" value="${entry ? entry.fechaPago || '' : ''}"></td>
-                <td><input type="text" class="input inp-medio" placeholder="Bizum..." value="${entry ? entry.medio || '' : ''}"></td>
-                <td><input type="text" class="input inp-notas" value="${entry ? entry.notas || '' : ''}"></td>
-                <td><input type="number" class="input inp-cantidad" min="0" step="0.01" value="${cantidadPagada}" style="max-width:90px;"></td>
-            `;
-        // ...eventos...
-        tbody.appendChild(tr);
-      } catch (err) {
-        console.error('renderPagos row error', err, p);
-      }
-    });
-
-  // Restar jugadas y sumar premios al dinero salido/entrado
-  (state.sorteos || []).forEach((s) => {
-    if (Array.isArray(s.jugadores)) dineroSalido += (s.jugadores.length || 0) * (state.config.costeApuesta || 2.5);
-    if (s.resultados && s.resultados.totalDistributed) dineroEntrado += s.resultados.totalDistributed;
-  });
-  saldoTotal = dineroEntrado - dineroSalido;
-
-  // Mostrar saldo total en el pie de la tabla
-  const saldoTotalCell = utils.$('#paySaldoTotal');
-  if (saldoTotalCell) saldoTotalCell.textContent = utils.euro(saldoTotal);
-
-  // Mostrar resumen de movimientos
-  const resumenDiv = utils.$('#payResumenMovimientos');
-  if (resumenDiv) {
-    resumenDiv.innerHTML =
-      resumenDiv.innerHTML =
-        `<span style='color:var(--accent2);'>Total dinero entrado:</span> <b>${utils.euro(dineroEntrado)}</b> &nbsp; | &nbsp; ` +
-        `<span style='color:var(--danger);'>Total dinero salido:</span> <b>${utils.euro(dineroSalido)}</b> &nbsp; | &nbsp; ` +
-        `<span style='color:var(--muted);'>Saldo en cuenta:</span> <b>${utils.euro(saldoTotal)}</b>`;
-      }
+  const bodyHtml = `
+    <div class="row">
+        <div class="grow stack">
+            <h4>Apuestas</h4>
+            <div id="mdApuestasList">${apuestasHtml}</div>
+            <hr>
+            <h4>Añadir Apuesta</h4>
+            <div class="row">
+                <div class="grow">
+                    <label class="label">Números (5)</label>
+                    <input class="input" id="newApNums" placeholder="2, 10, 25, 40, 48">
+                </div>
+                <div>
+                    <label class="label">Estrellas (2)</label>
+                    <input class="input" id="newApEsts" placeholder="5, 9" style="width:100px;">
+                </div>
+                <button class="btn btn-primary" id="btnAddAp">Añadir</button>
+            </div>
+        </div>
+        <div class="divider"></div>
+        <div class="grow stack">
+            <h4>Resultados y Premio</h4>
+            <div class="row">
+                <div class="grow">
+                    <label class="label">N. Ganadores</label>
+                    <input class="input" id="mdWinN" placeholder="Ej: 2, 15, 20, 33, 48" value="${s.resultados ? s.resultados.winNums.join(', ') : ''}">
+                </div>
+                <div style="width:120px">
+                    <label class="label">Estrellas</label>
+                    <input class="input" id="mdWinE" placeholder="Ej: 5, 9" value="${s.resultados ? s.resultados.winStars.join(', ') : ''}">
+                </div>
+            </div>
+            <div class="row">
+                <div class="grow">
+                    <label class="label">Premio Total (€)</label>
+                    <input type="number" min="0" step="0.01" class="input" id="mdPremio" value="${s.premio || 0}">
+                </div>
+                <div class="grow">
+                    <label class="label">Nota (opcional)</label>
+                    <input class="input" id="mdNota" value="${utils.escapeHtml(s.nota || '')}">
+                </div>
+            </div>
+            <div class="row">
+              <button class="btn btn-primary" id="btnRegistrarResultados">Registrar Resultados</button>
+              <button class="btn btn-ghost" id="btnProcesarPegado">Pegar y Procesar</button>
+            </div>
+            <textarea id="mdPasteResults" class="input" rows="3" placeholder="Pega aquí los resultados de Euromillones para auto-rellenar."></textarea>
+            <div id="mdResultadosSummary" class="item-sub" style="margin-top:10px;">${s.resultados ? `Ganadores: ${s.resultados.totalWinners} · Total repartido: ${utils.euro(s.resultados.totalDistributed)}` : ''}</div>
+        </div>
+    </div>
+  `;
 
   // Attach handlers for removing apuestas inside the modal (no globals)
   // We'll add the listeners after opening the modal to ensure nodes exist
@@ -591,7 +612,6 @@ function openDrawDetail(drawId) {
     };
   }
 
-
   // Procesar pegado manual
   const btnProcesar = utils.$('#btnProcesarPegado');
   if (btnProcesar) {
@@ -602,6 +622,7 @@ function openDrawDetail(drawId) {
       utils.$('#mdWinN').value = parsed.winNums.join(',');
       utils.$('#mdWinE').value = parsed.winStars.join(',');
       if (parsed.prize) utils.$('#mdPremio').value = parsed.prize;
+      const mdStatus = utils.$('#mdResultadosSummary');
       if (mdStatus) mdStatus.textContent = 'Resultados procesados. Revísalos y pulsa Registrar.';
     };
   }

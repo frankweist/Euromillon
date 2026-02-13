@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Peña Euromillones</title>
+    <title>Peña Serveo Euromillones</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -11,7 +11,7 @@
       <div class="brand">
         <div class="logo">€</div>
         <div>
-          <div class="title">Peña Euromillones</div>
+          <div class="title">Peña Serveo Euromillones</div>
           <div class="subtitle">Control de participantes · pagos · sorteos</div>
         </div>
       </div>
@@ -64,17 +64,12 @@
                 </div>
                 <div class="kpi">
                   <div class="kpi-label">Pagados (mes)</div>
-            <tfoot>
-              <tr>
-                <td colspan="6" style="text-align:right;">Saldo en cuenta:</td>
-                <td id="paySaldoTotal" style="font-weight:bold;"></td>
-              </tr>
-              <tr>
-                <td colspan="7">
-                  <div id="payResumenMovimientos" style="margin-top:8px;font-size:0.95em;"></div>
-                </td>
-              </tr>
-            </tfoot>
+                  <div class="kpi-value" id="kpiPagados">0</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">Pendientes (mes)</div>
+                  <div class="kpi-value" id="kpiPendientes">0</div>
+                </div>
               </div>
 
               <div class="divider"></div>
@@ -83,6 +78,10 @@
                 <div>
                   <div class="muted">Coste por apuesta simple (España)</div>
                   <div class="big" id="dashCosteApuesta">2,50 €</div>
+                </div>
+                <div class="grow align-right">
+                  <div class="muted">Pago mensual sugerido</div>
+                  <div class="big" id="dashMensualSugerido">20,00 €</div>
                 </div>
               </div>
 
@@ -159,12 +158,15 @@
               </p>
             </div>
           </div>
-
-          <!-- Últimos números jugados debajo del próximo sorteo -->
-          <div style="margin-top: 18px;">
-            <div class="muted" style="font-weight:600;">Últimos números jugados</div>
-            <div id="dashUltimosJugados">
-              <div class="muted">No hay apuestas registradas aún.</div>
+          
+          <div class="card">
+            <div class="card-header">
+              <h2>Últimos números jugados</h2>
+            </div>
+            <div class="card-body">
+              <div id="dashUltimosJugados">
+                <div class="muted">No hay apuestas registradas aún.</div>
+              </div>
             </div>
           </div>
 
@@ -265,12 +267,13 @@
                     <th>Medio</th>
                     <th>Notas</th>
                     <th>Importe pagado</th>
-                    <th>Saldo en cuenta</th>
                   </tr>
                 </thead>
                 <tbody id="payTbody"></tbody>
               </table>
             </div>
+
+            <div id="payResumenMovimientos"></div>
 
             <p class="hint">
               La web usa el mes seleccionado para determinar quién juega en cada sorteo.
@@ -361,14 +364,6 @@
                   <label class="label">Buscar</label>
                   <input class="input" id="drawSearch" placeholder="Fecha, nota..." />
                 </div>
-                <div class="grow">
-                  <label class="label">Filtrar</label>
-                  <select class="select" id="drawFilter">
-                    <option value="todos">Todos</option>
-                    <option value="pendientes">Pendientes de resguardo</option>
-                    <option value="enviados">Resguardo enviado</option>
-                  </select>
-                </div>
               </div>
 
               <div class="divider"></div>
@@ -380,38 +375,7 @@
       </section>
 
       <!-- RESULTADOS -->
-      <section class="panel" id="tab-resultados">
-        <div class="card">
-          <div class="card-header">
-            <h2>Resultados</h2>
-          </div>
-          <div class="card-body">
-            <div class="row">
-              <div class="grow">
-                <label class="label">Buscar</label>
-                <input class="input" id="resSearch" placeholder="Fecha, premio..." />
-              </div>
-              <div class="grow">
-                <label class="label">Filtrar</label>
-                <select class="select" id="resFilter">
-                  <option value="todos">Todos</option>
-                  <option value="conPremio">Con premio</option>
-                  <option value="sinPremio">Sin premio</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="divider"></div>
-
-            <div id="resList" class="list"></div>
-
-            <p class="hint">
-              En el detalle de cada sorteo puedes registrar el premio total y una nota de reparto
-              (bote, reparto, etc.).
-            </p>
-          </div>
-        </div>
-      </section>
+      <section class="panel" id="tab-resultados"></section>
 
       <!-- AJUSTES -->
       <section class="panel" id="tab-ajustes">
@@ -513,7 +477,9 @@
 
     <footer class="footer">
       <div class="muted">Local: no envía datos a Internet · Exporta JSON para copias.</div>
-    <div class="muted">Pruebas: `tests/e2e/smoke.spec.ts` (smoke) y `tests/e2e/full.spec.ts` (completo). Ver `TESTING.md` para más detalles.</div>
+      <div class="muted">Pruebas: `tests/e2e/smoke.spec.ts` (smoke) y `tests/e2e/full.spec.ts` (completo). Ver `TESTING.md` para más detalles.</div>
+    </footer>
+
     <script type="module" src="app.js"></script>
   </body>
 </html>

@@ -80,7 +80,7 @@ export function computeResultsForDraw(state, sorteo, winNums, winStars, premioTo
   (sorteo.apuestas || []).forEach((ap) => {
     const numAciertos = (ap.numeros || []).filter((n) => wn.includes(n)).length;
     const estAciertos = (ap.estrellas || []).filter((e) => we.includes(e)).length;
-    const gano = numAciertos >= 2 || (numAciertos >= 1 && estAciertos >= 2);
+    const gano = numAciertos >= 2 || (numAciertos >= 1 && estAciertos.length >= 2);
     if (gano) {
       winners.push({ type: 'apuesta', id: ap.id, numAciertos, estAciertos });
       apuestasCount++;
@@ -91,7 +91,7 @@ export function computeResultsForDraw(state, sorteo, winNums, winStars, premioTo
   (state.config.apuestasFijas || []).forEach((ap, idx) => {
     const numAciertos = (ap.nums || []).filter((n) => wn.includes(n)).length;
     const estAciertos = (ap.ests || []).filter((e) => we.includes(e)).length;
-    const gano = numAciertos >= 2 || (numAciertos >= 1 && estAciertos >= 2);
+    const gano = numAciertos >= 2 || (numAciertos >= 1 && estAciertos.length >= 2);
     if (gano) {
       winners.push({ type: 'fija', idx, numAciertos, estAciertos });
       fijasCount++;
@@ -112,5 +112,39 @@ export function computeResultsForDraw(state, sorteo, winNums, winStars, premioTo
     totalDistributed,
     perWinner,
     winners,
+  };
+}
+
+export function calculateAccounting(state) {
+  let totalIncome = 0;
+  let totalExpenses = 0;
+  let totalPrizes = 0;
+
+  // Calculate total income from payments
+  Object.values(state.pagos).forEach(month => {
+    Object.values(month.entries).forEach(entry => {
+      if (typeof entry.cantidad === 'number') {
+        totalIncome += entry.cantidad;
+      }
+    });
+  });
+
+  // Calculate total expenses and prizes from draws
+  (state.sorteos || []).forEach(sorteo => {
+    if (Array.isArray(sorteo.jugadores)) {
+      totalExpenses += (sorteo.jugadores.length || 0) * (state.config.costeApuesta || 2.5);
+    }
+    if (sorteo.resultados && typeof sorteo.resultados.totalDistributed === 'number') {
+      totalPrizes += sorteo.resultados.totalDistributed;
+    }
+  });
+
+  const balance = totalIncome + totalPrizes - totalExpenses;
+
+  return {
+    totalIncome,
+    totalExpenses,
+    totalPrizes,
+    balance
   };
 }
