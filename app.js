@@ -996,45 +996,33 @@ function renderResultados() {
       const fecha = sorteo.fecha;
       const proxyUrl = state.config && state.config.proxy && state.config.proxy.url;
       const proxyKey = state.config && state.config.proxy && state.config.proxy.key;
-      if (resStatus) resStatus.textContent = proxyUrl ? 'Intentando obtener resultados desde el proxy configurado...' : 'Intentando obtener resultados desde TuLotero...';
-
-      // Try proxy first if configured
-      if (proxyUrl) {
-        try {
-          const params = [];
-          if (proxyKey) params.push(`key=${encodeURIComponent(proxyKey)}`);
-          if (fecha) params.push(`fecha=${encodeURIComponent(fecha)}`);
-          const url = proxyUrl + (proxyUrl.includes('?') ? '&' : '?') + params.join('&');
-          const res = await fetch(url, { headers: proxyKey ? { 'x-api-key': proxyKey } : {} });
-          const json = await res.json();
-          if (json && json.winNums && json.winStars) {
-            utils.$('#winN').value = json.winNums.join(',');
-            utils.$('#winE').value = json.winStars.join(',');
-            if (resStatus) resStatus.textContent = 'Resultados obtenidos desde el proxy.';
-            return;
-          }
-          if (resStatus) resStatus.textContent = 'El proxy no devolvió resultados. Intentando la web directamente...';
-        } catch (err) {
-          if (resStatus) resStatus.textContent = 'Error en el proxy (verifica URL/clave). Intentando la web directamente...';
-        }
+      if (!proxyUrl) {
+        if (resStatus) resStatus.textContent = 'No hay URL de proxy configurada en Ajustes.';
+        return;
       }
 
-      // Fallback: try direct tulotero fetch (may be blocked by CORS)
-      const url = 'https://tulotero.es/resultados-euromillones/';
+      if (resStatus) resStatus.textContent = 'Intentando obtener resultados desde el proxy...';
+
       try {
-        const res = await fetch(url);
-        const txt = await res.text();
-        const parsed = utils.parseResultsFromText(txt, fecha);
-        if (parsed) {
-          utils.$('#winN').value = parsed.winNums.join(',');
-          utils.$('#winE').value = parsed.winStars.join(',');
-          if (resStatus) resStatus.textContent = 'Resultados obtenidos automáticamente.';
-          if (resStatus) resStatus.textContent = 'Resultados obtenidos desde TuLotero (autofill). Revísalos y pulsa Comprobar.';
+        const params = [];
+        if (proxyKey) params.push(`key=${encodeURIComponent(proxyKey)}`);
+        if (fecha) params.push(`fecha=${encodeURIComponent(fecha)}`);
+        const url = proxyUrl + (proxyUrl.includes('?') ? '&' : '?') + params.join('&');
+        const res = await fetch(url, { headers: proxyKey ? { 'x-api-key': proxyKey } : {} });
+        if (!res.ok) {
+            throw new Error(`El proxy devolvió un error: ${res.status} ${res.statusText}`);
+        }
+        const json = await res.json();
+        if (json && json.winNums && json.winStars) {
+          utils.$('#winN').value = json.winNums.join(',');
+          utils.$('#winE').value = json.winStars.join(',');
+          if (resStatus) resStatus.textContent = 'Resultados obtenidos desde el proxy.';
         } else {
-          if (resStatus) resStatus.textContent = 'No se encontraron resultados en la página.';
+          if (resStatus) resStatus.textContent = 'El proxy no devolvió resultados válidos.';
         }
       } catch (err) {
-        if (resStatus) resStatus.textContent = 'No fue posible obtener la página (probable CORS).';
+        if (resStatus) resStatus.textContent = `Error al contactar el proxy: ${err.message}. Revisa la URL y la conexión.`;
+        console.error(err);
       }
     };
   }
