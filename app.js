@@ -1,9 +1,12 @@
+
 /* -------------------------------------------------------------------------
    app.js - Orquestador Principal (Módulos)
    ------------------------------------------------------------------------- */
 import * as utils from './js/utils.js';
 import * as ui from './js/ui.js';
 import * as logic from './js/logic.js';
+
+document.addEventListener('DOMContentLoaded', () => {
 
 // Estado global de la aplicación
 let state = utils.loadState();
@@ -1185,3 +1188,5 @@ function massUpdatePayments(status) {
   utils.saveState(state);
   renderPagos(); // Refrescar la tabla para ver los cambios
 }
+
+});
