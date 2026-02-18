@@ -10,6 +10,7 @@ const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const cors = require('cors');
+const path = require('path');
 const NodeCache = require('node-cache');
 
 const PORT = process.env.PORT || 3003;
@@ -22,13 +23,18 @@ const app = express();
 app.use(cors());
 app.options('*', cors());
 
+// Serve static files from the root directory (one level up from 'fetcher')
+const staticPath = path.join(__dirname, '..');
+console.log(`Serving static files from: ${staticPath}`);
+app.use(express.static(staticPath));
+
 const cache = new NodeCache({ stdTTL: CACHE_TTL });
 
 function parseHtmlForResults(html, fecha = null) {
   const $ = cheerio.load(html);
   let jsonText = null;
 
-  // Busca el <script> que contiene "console.log({\"resultados\":["
+  // Busca el <script> que contiene "console.log({"resultados":["
   $('script').each((i, el) => {
     const txt = $(el).html() || '';
     if (txt.includes('console.log({"resultados":[')) {
@@ -160,6 +166,6 @@ app.get('/fetch', async (req, res) => {
 
 module.exports = { parseHtmlForResults };
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 tulotero-proxy listening on ${PORT}`);
 });
