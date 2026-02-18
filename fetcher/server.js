@@ -23,57 +23,32 @@ const app = express();
 app.use(cors());
 app.options('*', cors());
 
-// Serve static files from the root directory (one level up from 'fetcher')
-const staticPath = path.join(__dirname, '..');
-console.log(`Serving static files from: ${staticPath}`);
-app.use(express.static(staticPath));
-
 const cache = new NodeCache({ stdTTL: CACHE_TTL });
 
 function parseHtmlForResults(html, fecha = null) {
   const $ = cheerio.load(html);
   let jsonText = null;
 
-  // Busca el <script> que contiene "console.log({"resultados":["
   $('script').each((i, el) => {
     const txt = $(el).html() || '';
     if (txt.includes('console.log({"resultados":[')) {
       jsonText = txt;
-      console.log('✅ Script encontrado');
     }
   });
 
-  if (!jsonText) {
-    console.log('❌ No se encontró el script con resultados');
-    return null;
-  }
-
-  console.log('📄 Script encontrado, longitud:', jsonText.length);
+  if (!jsonText) return null;
 
   const match = jsonText.match(/console\.log\((\{[\s\S]*?\})\);?/);
-  if (!match) {
-    console.log('❌ No se pudo hacer match del JSON de resultados');
-    return null;
-  }
-
-  console.log('✅ Match JSON encontrado');
+  if (!match) return null;
 
   let data;
   try {
     data = JSON.parse(match[1]);
   } catch (e) {
-    console.log('❌ Error parseando JSON de resultados:', e.message);
     return null;
   }
 
-  console.log('✅ JSON parseado correctamente');
-
-  if (!data.resultados || !data.resultados.length) {
-    console.log('❌ resultados vacío o sin elementos');
-    return null;
-  }
-
-  console.log('📊 Encontrados', data.resultados.length, 'resultados');
+  if (!data.resultados || !data.resultados.length) return null;
 
   const normalizeDate = (s) => {
     if (!s) return null;
@@ -94,78 +69,69 @@ function parseHtmlForResults(html, fecha = null) {
       const cand = normalizeDate(r.fecha) || normalizeDate(r.date) || '';
       return cand && cand === target;
     });
-    if (first) console.log('🔎 Resultado encontrado por fecha:', fecha);
-    else console.log('⚠️ No se encontró resultado por fecha, aplicando heurística');
   }
 
   if (!first) {
     first = data.resultados.find((r) => r.juego === 'EUROMILLONES') || data.resultados[0];
   }
 
-  if (!first || !first.combinacion || !first.estrella1 || !first.estrella2) {
-    console.log('❌ Estructura de resultado inesperada:', first);
-    return null;
-  }
+  if (!first || !first.combinacion || !first.estrella1 || !first.estrella2) return null;
 
   const winNums = first.combinacion.split(',').map((n) => parseInt(n, 10));
   const winStars = [first.estrella1, first.estrella2].map((n) => parseInt(n, 10));
 
-  if (winNums.length !== 5 || winStars.length !== 2 || winNums.some(isNaN) || winStars.some(isNaN)) {
-    console.log('❌ Números/estrellas no válidos:', winNums, winStars);
-    return null;
-  }
+  if (winNums.length !== 5 || winStars.length !== 2 || winNums.some(isNaN) || winStars.some(isNaN)) return null;
 
-  console.log('✅ ÉXITO! Números:', winNums, 'Estrellas:', winStars);
   return { winNums, winStars };
 }
 
+// API route. This MUST be defined before the static middleware.
 app.get('/fetch', async (req, res) => {
   const key = req.query.key || req.headers['x-api-key'];
-  console.log('🌐 Petición recibida en /fetch');
-  console.log('🔑 Key recibida:', key || 'SIN KEY');
-
-  // SIN VALIDACIÓN - siempre pasa
-  console.log('✅ Key OK (sin validación)');
-
   const fecha = req.query.fecha || req.query.date || null;
   const cacheKey = fecha ? `result:${fecha}` : 'latest';
   const cached = cache.get(cacheKey);
+
   if (cached) {
-    console.log('💾 Respuesta servida desde cache:', cached);
+    console.log('💾 Serving from cache');
     return res.json(cached);
   }
 
   try {
-    console.log('🔄 Haciendo petición a tulotero.es...');
+    console.log('🔄 Fetching from tulotero.es...');
     const r = await axios.get('https://tulotero.es/resultados-euromillones/', {
       timeout: 10000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'Connection': 'keep-alive'
       },
     });
 
-    console.log('✅ HTML recibido, longitud:', r.data.length);
     const parsed = parseHtmlForResults(r.data, fecha);
-    console.log('🎯 Resultado del parseo:', parsed);
-
-    const out = parsed ? { ...parsed, source: 'tulotero', matchedFecha: fecha || null } : { error: 'not_found' };
+    const out = parsed ? { ...parsed, source: 'tulotero' } : { error: 'not_found' };
+    
     if (parsed) {
-        cache.set(cacheKey, out);
-        console.log('💾 Cache guardado:', out);
+      cache.set(cacheKey, out);
     }
     res.json(out);
+
   } catch (err) {
-    console.error('💥 fetch error:', err);
-    res.status(502).json({ error: 'fetch_failed', details: err.message, code: err.code });
+    console.error('💥 Fetch error:', err.message);
+    res.status(502).json({ error: 'fetch_failed', details: err.message });
   }
 });
 
-module.exports = { parseHtmlForResults };
+// Serve static files from the root directory (one level up from 'fetcher')
+// This should be defined AFTER the API routes.
+const staticPath = path.join(__dirname, '..');
+console.log(`Serving static files from: ${staticPath}`);
+app.use(express.static(staticPath));
+
+// Fallback for Single Page Applications (SPA). Send index.html for any other unknown requests.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(staticPath, 'index.html'));
+});
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 tulotero-proxy listening on ${PORT}`);
+  console.log(`🚀 tulotero-proxy listening on http://localhost:${PORT}`);
 });
