@@ -15,10 +15,12 @@ const NodeCache = require('node-cache');
 const PORT = process.env.PORT || 3003;
 const KEY = process.env.PROXY_KEY || '317a50fc-5772-498c-9c4b-fe9acbffed6e';
 const CACHE_TTL = parseInt(process.env.CACHE_TTL || '600', 10);
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*';
 
 const app = express();
-app.use(cors({ origin: ALLOWED_ORIGINS }));
+
+// Enable CORS for all origins and methods
+app.use(cors());
+app.options('*', cors());
 
 const cache = new NodeCache({ stdTTL: CACHE_TTL });
 
@@ -26,10 +28,10 @@ function parseHtmlForResults(html, fecha = null) {
   const $ = cheerio.load(html);
   let jsonText = null;
 
-  // Busca el <script> que contiene "console.log({"resultados":[
+  // Busca el <script> que contiene "console.log({\"resultados\":[
   $('script').each((i, el) => {
     const txt = $(el).html() || '';
-    if (txt.includes('console.log({') && txt.includes('"resultados"')) {
+    if (txt.includes('console.log({"resultados":[')) {
       jsonText = txt;
       console.log('✅ Script encontrado');
     }
@@ -42,7 +44,6 @@ function parseHtmlForResults(html, fecha = null) {
 
   console.log('📄 Script encontrado, longitud:', jsonText.length);
 
-  // Extrae el objeto pasado a console.log( ... )
   const match = jsonText.match(/console\.log\((\{[\s\S]*?\})\);?/);
   if (!match) {
     console.log('❌ No se pudo hacer match del JSON de resultados');
@@ -68,17 +69,13 @@ function parseHtmlForResults(html, fecha = null) {
 
   console.log('📊 Encontrados', data.resultados.length, 'resultados');
 
-  // Si se proporciona una fecha, intentamos encontrar el resultado que concuerde con esa fecha
   const normalizeDate = (s) => {
     if (!s) return null;
     s = ('' + s).trim();
-    // dd/mm/yyyy
     const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (m1) return `${m1[3]}-${m1[2]}-${m1[1]}`;
-    // yyyy-mm-dd
     const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`;
-    // buscar dd/mm/yyyy dentro del texto
     const m3 = s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
     if (m3) return `${m3[3]}-${m3[2]}-${m3[1]}`;
     return s;
@@ -95,7 +92,6 @@ function parseHtmlForResults(html, fecha = null) {
     else console.log('⚠️ No se encontró resultado por fecha, aplicando heurística');
   }
 
-  // Fallback: Primer resultado de Euromillones o el primero del array
   if (!first) {
     first = data.resultados.find((r) => r.juego === 'EUROMILLONES') || data.resultados[0];
   }
@@ -125,7 +121,6 @@ app.get('/fetch', async (req, res) => {
   // SIN VALIDACIÓN - siempre pasa
   console.log('✅ Key OK (sin validación)');
 
-  // Soportamos cache por fecha: si se pasa fecha en query, la usamos para la key
   const fecha = req.query.fecha || req.query.date || null;
   const cacheKey = fecha ? `result:${fecha}` : 'latest';
   const cached = cache.get(cacheKey);
@@ -138,30 +133,33 @@ app.get('/fetch', async (req, res) => {
     console.log('🔄 Haciendo petición a tulotero.es...');
     const r = await axios.get('https://tulotero.es/resultados-euromillones/', {
       timeout: 10000,
-      headers: { 'User-Agent': 'tulotero-proxy/1.0 (+https://example.com)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Connection': 'keep-alive'
+      },
     });
 
     console.log('✅ HTML recibido, longitud:', r.data.length);
-    console.log('📄 HTML primeros 500 caracteres:', r.data.slice(0, 500));
-
-    const fecha = req.query.fecha || req.query.date || null;
     const parsed = parseHtmlForResults(r.data, fecha);
     console.log('🎯 Resultado del parseo:', parsed);
 
     const out = parsed ? { ...parsed, source: 'tulotero', matchedFecha: fecha || null } : { error: 'not_found' };
-    cache.set(cacheKey, out);
-    console.log('💾 Cache guardado:', out);
+    if (parsed) {
+        cache.set(cacheKey, out);
+        console.log('💾 Cache guardado:', out);
+    }
     res.json(out);
   } catch (err) {
-    console.error('💥 fetch error:', err.message);
-    res.status(502).json({ error: 'fetch_failed' });
+    console.error('💥 fetch error:', err);
+    res.status(502).json({ error: 'fetch_failed', details: err.message, code: err.code });
   }
 });
 
-// Export para tests
 module.exports = { parseHtmlForResults };
 
-// Puerto
 app.listen(PORT, () => {
   console.log(`🚀 tulotero-proxy listening on ${PORT}`);
 });

@@ -1,0 +1,12 @@
+
+services:
+  - type: web
+    name: tulotero-proxy
+    env: node
+    plan: free
+    # Region a elegir, frankfurt es una buena opcion para europa
+    region: frankfurt 
+    # Directorio donde esta el codigo
+    rootDir: ./fetcher
+    buildCommand: "npm install"
+    startCommand: "node server.js"
