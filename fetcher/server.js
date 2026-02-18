@@ -28,7 +28,7 @@ function parseHtmlForResults(html, fecha = null) {
   const $ = cheerio.load(html);
   let jsonText = null;
 
-  // Busca el <script> que contiene "console.log({\"resultados\":[
+  // Busca el <script> que contiene "console.log({\"resultados\":["
   $('script').each((i, el) => {
     const txt = $(el).html() || '';
     if (txt.includes('console.log({"resultados":[')) {
