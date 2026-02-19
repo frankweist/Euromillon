@@ -64,14 +64,14 @@ function parseHtmlForResults(html, fecha = null) {
 
   let first = null;
   if (fecha) {
+    // If a specific date is provided, find that result.
     const target = normalizeDate(fecha);
     first = data.resultados.find((r) => {
       const cand = normalizeDate(r.fecha) || normalizeDate(r.date) || '';
       return cand && cand === target;
     });
-  }
-
-  if (!first) {
+  } else {
+    // Otherwise, find the latest Euromillones result.
     first = data.resultados.find((r) => r.juego === 'EUROMILLONES') || data.resultados[0];
   }
 

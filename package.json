@@ -2,19 +2,24 @@
   "name": "euromillones-app",
   "version": "1.0.0",
   "description": "Gestor de peña de Euromillones",
-  "main": "server.js",
-  "author": "Tu Nombre",
+  "main": "fetcher/server.js",
+  "author": "BricoFrank",
   "license": "MIT",
   "scripts": {
-    "start": "node server.js"
+    "start": "node fetcher/server.js",
+    "lint": "eslint . --fix"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "axios": "^1.4.0",
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "node-cache": "^5.1.2"
   },
   "devDependencies": {
-    "eslint": "^9.39.2",
+    "eslint": "^9.3.0",
     "husky": "^9.0.11",
-    "lint-staged": "^15.2.7"
+    "lint-staged": "^15.2.2"
   },
   "lint-staged": {
     "*.js": "eslint --fix"
