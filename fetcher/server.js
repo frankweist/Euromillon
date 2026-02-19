@@ -1,5 +1,6 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 const NodeCache = require('node-cache');
 const cors = require('cors');
 
@@ -12,12 +13,10 @@ const TULOTERO_URL = 'https://www.tulotero.es/euromillones/resultados';
 app.use(cors());
 app.options('*', cors());
 
-// Root endpoint to provide a status message
 app.get('/', (req, res) => {
   res.status(200).send('Proxy service is running. Use the /resultados endpoint to get Euromillones results.');
 });
 
-// Health check endpoint to verify deployment success
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
@@ -28,13 +27,9 @@ async function fetchResultsWithPuppeteer(fecha = null) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--single-process'
-      ],
-      headless: true,
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();
