@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: tulotero-proxy
+    env: node
+    plan: free
+    buildCommand: "npm install && npx puppeteer browsers install chrome"
+    startCommand: "node fetcher/server.js"
+    envVars:
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/.cache/puppeteer
