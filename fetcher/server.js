@@ -20,22 +20,22 @@ function parseHtmlForResults(html, fecha = null) {
   const $ = cheerio.load(html);
   const sorteos = [];
 
-  // Busca cada bloque de resultado individual
-  $('.game-result').each((i, element) => {
+  // Find each result block
+  $('app-game-draw-result').each((i, element) => {
     const sorteo = {};
 
-    // Extrae la fecha del sorteo
-    const fechaText = $(element).find('.date').text().trim();
+    // Extract the date from the specific element
+    const fechaText = $(element).find('h3.font-bold.text-lg.text-primary.uppercase').text().trim();
     sorteo.fecha = fechaText;
 
-    // Extrae los números principales
+    // Extract the main numbers
     const numeros = [];
     $(element).find('.number-box .number').each((j, num) => {
       numeros.push($(num).text().trim());
     });
     sorteo.numeros = numeros;
 
-    // Extrae las estrellas
+    // Extract the stars
     const estrellas = [];
     $(element).find('.star-box .number').each((j, star) => {
       estrellas.push($(star).text().trim());
@@ -45,12 +45,12 @@ function parseHtmlForResults(html, fecha = null) {
     sorteos.push(sorteo);
   });
 
-  // Si se pide una fecha concreta, la busca
+  // If a specific date is requested, find it
   if (fecha) {
     return sorteos.find(sorteo => sorteo.fecha === fecha);
   }
 
-  // Si no, devuelve el último resultado encontrado
+  // Otherwise, return the latest result found
   return sorteos.length > 0 ? sorteos[0] : null;
 }
 
@@ -72,7 +72,7 @@ app.get('/resultados', async (req, res) => {
       cache.set(cacheKey, result);
       res.json(result);
     } else {
-      res.status(404).json({ error: 'Resultados no encontrados para la fecha especificada.' });
+      res.status(404).json({ error: 'Resultados no encontrados.' });
     }
   } catch (error) {
     console.error('Error fetching data:', error);
