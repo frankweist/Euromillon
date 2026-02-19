@@ -12,12 +12,21 @@ const TULOTERO_URL = 'https://www.tulotero.es/euromillones/resultados';
 app.use(cors());
 app.options('*', cors());
 
+// Root endpoint to provide a status message
+app.get('/', (req, res) => {
+  res.status(200).send('Proxy service is running. Use the /resultados endpoint to get Euromillones results.');
+});
+
+// Health check endpoint to verify deployment success
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 const cache = new NodeCache({ stdTTL: CACHE_TTL });
 
 async function fetchResultsWithPuppeteer(fecha = null) {
   let browser;
   try {
-    // Launch Puppeteer with args required for Render/Docker environments
     browser = await puppeteer.launch({
       args: [
         '--no-sandbox',
@@ -25,13 +34,12 @@ async function fetchResultsWithPuppeteer(fecha = null) {
         '--disable-dev-shm-usage',
         '--single-process'
       ],
-      headless: true, // Run in headless mode
+      headless: true,
     });
 
     const page = await browser.newPage();
-    await page.goto(TULOTERO_URL, { waitUntil: 'networkidle0' }); // Wait until the page is fully loaded
+    await page.goto(TULOTERO_URL, { waitUntil: 'networkidle0' });
 
-    // Wait for the specific result component to be present
     await page.waitForSelector('app-game-draw-result');
 
     const sorteos = await page.evaluate(() => {
