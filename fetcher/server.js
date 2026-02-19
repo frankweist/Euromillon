@@ -1,6 +1,5 @@
 const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 const NodeCache = require('node-cache');
 const cors = require('cors');
 
@@ -10,50 +9,69 @@ const port = process.env.PORT || 3000;
 const CACHE_TTL = 60 * 60; // 1 hour
 const TULOTERO_URL = 'https://www.tulotero.es/euromillones/resultados';
 
-// Enable CORS for all origins and methods
 app.use(cors());
 app.options('*', cors());
 
 const cache = new NodeCache({ stdTTL: CACHE_TTL });
 
-function parseHtmlForResults(html, fecha = null) {
-  const $ = cheerio.load(html);
-  const sorteos = [];
-
-  // Find each result block
-  $('app-game-draw-result').each((i, element) => {
-    const sorteo = {};
-
-    // Extract the date from the specific element
-    const fechaText = $(element).find('h3.font-bold.text-lg.text-primary.uppercase').text().trim();
-    sorteo.fecha = fechaText;
-
-    // Extract the main numbers
-    const numeros = [];
-    $(element).find('.number-box .number').each((j, num) => {
-      numeros.push($(num).text().trim());
+async function fetchResultsWithPuppeteer(fecha = null) {
+  let browser;
+  try {
+    // Launch Puppeteer with args required for Render/Docker environments
+    browser = await puppeteer.launch({
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process'
+      ],
+      headless: true, // Run in headless mode
     });
-    sorteo.numeros = numeros;
 
-    // Extract the stars
-    const estrellas = [];
-    $(element).find('.star-box .number').each((j, star) => {
-      estrellas.push($(star).text().trim());
+    const page = await browser.newPage();
+    await page.goto(TULOTERO_URL, { waitUntil: 'networkidle0' }); // Wait until the page is fully loaded
+
+    // Wait for the specific result component to be present
+    await page.waitForSelector('app-game-draw-result');
+
+    const sorteos = await page.evaluate(() => {
+      const results = [];
+      document.querySelectorAll('app-game-draw-result').forEach(element => {
+        const sorteo = {};
+        const fechaText = element.querySelector('h3.font-bold.text-lg.text-primary.uppercase')?.innerText.trim();
+        if (fechaText) {
+            sorteo.fecha = fechaText;
+
+            const numeros = [];
+            element.querySelectorAll('.number-box .number').forEach(num => {
+            numeros.push(num.innerText.trim());
+            });
+            sorteo.numeros = numeros;
+
+            const estrellas = [];
+            element.querySelectorAll('.star-box .number').forEach(star => {
+            estrellas.push(star.innerText.trim());
+            });
+            sorteo.estrellas = estrellas;
+
+            results.push(sorteo);
+        }
+      });
+      return results;
     });
-    sorteo.estrellas = estrellas;
 
-    sorteos.push(sorteo);
-  });
+    if (fecha) {
+      return sorteos.find(sorteo => sorteo.fecha === fecha);
+    }
 
-  // If a specific date is requested, find it
-  if (fecha) {
-    return sorteos.find(sorteo => sorteo.fecha === fecha);
+    return sorteos.length > 0 ? sorteos[0] : null;
+
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
-
-  // Otherwise, return the latest result found
-  return sorteos.length > 0 ? sorteos[0] : null;
 }
-
 
 app.get('/resultados', async (req, res) => {
   const { fecha } = req.query;
@@ -61,22 +79,23 @@ app.get('/resultados', async (req, res) => {
 
   const cachedData = cache.get(cacheKey);
   if (cachedData) {
+    console.log(`[Cache] HIT for key: ${cacheKey}`);
     return res.json(cachedData);
   }
+  console.log(`[Cache] MISS for key: ${cacheKey}`);
 
   try {
-    const { data: html } = await axios.get(TULOTERO_URL);
-    const result = parseHtmlForResults(html, fecha);
+    const result = await fetchResultsWithPuppeteer(fecha);
 
     if (result) {
       cache.set(cacheKey, result);
       res.json(result);
     } else {
-      res.status(404).json({ error: 'Resultados no encontrados.' });
+      res.status(404).json({ error: 'Resultados no encontrados con Puppeteer.' });
     }
   } catch (error) {
-    console.error('Error fetching data:', error);
-    res.status(500).json({ error: 'Error al obtener los datos.' });
+    console.error('Error fetching data with Puppeteer:', error);
+    res.status(500).json({ error: 'Error al obtener los datos con Puppeteer.' });
   }
 });
 
