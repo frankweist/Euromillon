@@ -3,6 +3,7 @@ const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const NodeCache = require('node-cache');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -13,10 +14,11 @@ const TULOTERO_URL = 'https://www.tulotero.es/euromillones/resultados';
 app.use(cors());
 app.options('*', cors());
 
-app.get('/', (req, res) => {
-  res.status(200).send('Proxy service is running. Use the /resultados endpoint to get Euromillones results.');
-});
+// Servir ficheros estáticos desde el directorio raíz del proyecto
+app.use(express.static(path.join(__dirname, '..')));
 
+// La ruta raíz ahora servirá index.html gracias a express.static
+// Mantenemos esta ruta de API por si se accede directamente a /health
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
