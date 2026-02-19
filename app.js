@@ -994,12 +994,11 @@ function renderResultados() {
       const sorteo = sorteos.find(x => x.id === selId);
       if (!sorteo) return;
       const fecha = sorteo.fecha;
-      const proxyUrl = state.config && state.config.proxy && state.config.proxy.url;
+
       const proxyKey = state.config && state.config.proxy && state.config.proxy.key;
-      if (!proxyUrl) {
-        if (resStatus) resStatus.textContent = 'No hay URL de proxy configurada en Ajustes.';
-        return;
-      }
+      
+      // La URL del proxy ya no se lee de la configuración, es siempre relativa.
+      const proxyUrl = '/fetch';
 
       if (resStatus) resStatus.textContent = 'Intentando obtener resultados desde el proxy...';
 
@@ -1007,19 +1006,27 @@ function renderResultados() {
         const params = [];
         if (proxyKey) params.push(`key=${encodeURIComponent(proxyKey)}`);
         if (fecha) params.push(`fecha=${encodeURIComponent(fecha)}`);
-        const url = proxyUrl + (proxyUrl.includes('?') ? '&' : '?') + params.join('&');
+        const url = proxyUrl + (params.length > 0 ? '?' + params.join('&') : '');
         const res = await fetch(url, { headers: proxyKey ? { 'x-api-key': proxyKey } : {} });
         if (!res.ok) {
             throw new Error(`El proxy devolvió un error: ${res.status} ${res.statusText}`);
         }
-        const json = await res.json();
-        if (json && json.winNums && json.winStars) {
-          utils.$('#winN').value = json.winNums.join(',');
-          utils.$('#winE').value = json.winStars.join(',');
-          if (resStatus) resStatus.textContent = 'Resultados obtenidos desde el proxy.';
-        } else {
-          if (resStatus) resStatus.textContent = 'El proxy no devolvió resultados válidos.';
+
+        const text = await res.text();
+        try {
+          const json = JSON.parse(text);
+          if (json && json.winNums && json.winStars) {
+            utils.$('#winN').value = json.winNums.join(',');
+            utils.$('#winE').value = json.winStars.join(',');
+            if (resStatus) resStatus.textContent = 'Resultados obtenidos desde el proxy.';
+          } else {
+            if (resStatus) resStatus.textContent = 'El proxy no devolvió resultados válidos.';
+          }
+        } catch(e) {
+          console.error("JSON parsing error:", e, "\nResponse text:", text);
+          if (resStatus) resStatus.textContent = `Error al interpretar la respuesta del proxy: ${e.message}. Revisa la consola para más detalles.`;
         }
+
       } catch (err) {
         if (resStatus) resStatus.textContent = `Error al contactar el proxy: ${err.message}. Revisa la URL y la conexión.`;
         console.error(err);
