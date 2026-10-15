@@ -4,9 +4,11 @@ const chromium = require('@sparticuz/chromium');
 const NodeCache = require('node-cache');
 const cors = require('cors');
 const path = require('path');
+const { timingSafeEqual } = require('crypto');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const PROXY_KEY = process.env.PROXY_KEY;
 
 const CACHE_TTL = 60 * 60; // 1 hour
 const TULOTERO_URL = 'https://www.tulotero.es/euromillones/resultados';
@@ -24,8 +26,9 @@ app.get('/health', (req, res) => {
 });
 
 const cache = new NodeCache({ stdTTL: CACHE_TTL });
+let resultsPromise = null;
 
-async function fetchResultsWithPuppeteer(fecha = null) {
+async function fetchResultsWithPuppeteer() {
   let browser;
   try {
     browser = await puppeteer.launch({
@@ -65,11 +68,7 @@ async function fetchResultsWithPuppeteer(fecha = null) {
       return results;
     });
 
-    if (fecha) {
-      return sorteos.find(sorteo => sorteo.fecha === fecha);
-    }
-
-    return sorteos.length > 0 ? sorteos[0] : null;
+    return sorteos;
 
   } finally {
     if (browser) {
@@ -80,27 +79,45 @@ async function fetchResultsWithPuppeteer(fecha = null) {
 
 app.get('/resultados', async (req, res) => {
   const { fecha } = req.query;
-  const cacheKey = fecha || 'latest';
-
-  const cachedData = cache.get(cacheKey);
-  if (cachedData) {
-    console.log(`[Cache] HIT for key: ${cacheKey}`);
-    return res.json(cachedData);
+  if (fecha !== undefined && (typeof fecha !== 'string' || fecha.length > 100)) {
+    return res.status(400).json({ error: 'Fecha inválida.' });
   }
-  console.log(`[Cache] MISS for key: ${cacheKey}`);
+
+  if (PROXY_KEY) {
+    const suppliedKey = req.get('x-api-key') || req.query.key;
+    const expected = Buffer.from(PROXY_KEY);
+    if (typeof suppliedKey !== 'string' ||
+        Buffer.byteLength(suppliedKey) !== expected.length ||
+        !timingSafeEqual(Buffer.from(suppliedKey), expected)) {
+      return res.status(401).json({ error: 'No autorizado.' });
+    }
+  }
 
   try {
-    const result = await fetchResultsWithPuppeteer(fecha);
-
-    if (result) {
-      cache.set(cacheKey, result);
-      res.json(result);
-    } else {
-      res.status(404).json({ error: 'Resultados no encontrados con Puppeteer.' });
+    let results = cache.get('all-results');
+    if (!results) {
+      if (cache.get('fetch-failed')) {
+        return res.status(503).json({ error: 'Resultados temporalmente no disponibles.' });
+      }
+      if (!resultsPromise) {
+        resultsPromise = fetchResultsWithPuppeteer()
+          .then(data => {
+            if (data.length) cache.set('all-results', data);
+            else cache.set('fetch-failed', true, 60);
+            return data;
+          })
+          .catch(error => { cache.set('fetch-failed', true, 60); throw error; })
+          .finally(() => { resultsPromise = null; });
+      }
+      results = await resultsPromise;
     }
+
+    const result = fecha ? results.find(sorteo => sorteo.fecha === fecha) : results[0];
+    if (result) return res.json(result);
+    return res.status(404).json({ error: 'Resultados no encontrados con Puppeteer.' });
   } catch (error) {
     console.error('Error fetching data with Puppeteer:', error);
-    res.status(500).json({ error: 'Error al obtener los datos con Puppeteer.' });
+    return res.status(500).json({ error: 'Error al obtener los datos con Puppeteer.' });
   }
 });
 
