@@ -83,14 +83,15 @@ app.get('/resultados', async (req, res) => {
     return res.status(400).json({ error: 'Fecha inválida.' });
   }
 
-  if (PROXY_KEY) {
-    const suppliedKey = req.get('x-api-key') || req.query.key;
-    const expected = Buffer.from(PROXY_KEY);
-    if (typeof suppliedKey !== 'string' ||
-        Buffer.byteLength(suppliedKey) !== expected.length ||
-        !timingSafeEqual(Buffer.from(suppliedKey), expected)) {
-      return res.status(401).json({ error: 'No autorizado.' });
-    }
+  if (!PROXY_KEY) {
+    return res.status(503).json({ error: 'Proxy no configurado.' });
+  }
+  const suppliedKey = req.get('x-api-key') || req.query.key;
+  const expected = Buffer.from(PROXY_KEY);
+  if (typeof suppliedKey !== 'string' ||
+      Buffer.byteLength(suppliedKey) !== expected.length ||
+      !timingSafeEqual(Buffer.from(suppliedKey), expected)) {
+    return res.status(401).json({ error: 'No autorizado.' });
   }
 
   try {
