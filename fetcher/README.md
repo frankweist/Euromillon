@@ -1,26 +1,17 @@
-# TuLotero Proxy (Docker)
+# Proxy de resultados de Euromillones
 
-Simple Node/Express proxy that fetches the Euromillones results page from TuLotero, parses the numbers and returns JSON { winNums, winStars, source }.
+El servidor Express de `fetcher/server.js` consulta la página de resultados de TuLotero y expone `GET /resultados`.
 
-Configuration via environment variables:
-- PROXY_KEY: optional API key to protect the endpoint
-- CACHE_TTL: seconds to cache the last response (default 600)
-- ALLOWED_ORIGINS: CORS Allow-Origin header (default '*')
-- PORT: server port (default 3000)
+## Configuración
 
-Build & push example (Docker Hub):
+- `PORT`: puerto HTTP (por defecto, `3000`).
+- `PROXY_KEY`: clave compartida opcional. Si está definida, cada petición a `/resultados` debe enviar `x-api-key: <clave>` o `?key=<clave>`. Es preferible la cabecera para evitar que la clave quede en URL y registros.
+- Si `PROXY_KEY` no está definida, el endpoint es público. Para un despliegue expuesto a Internet, configura una clave nueva y privada.
 
-1. Build locally:
-   docker build -t <youruser>/tulotero-proxy:latest ./fetcher
+El servidor guarda durante una hora la lista obtenida en una consulta y comparte una consulta en curso entre peticiones simultáneas. Si la consulta falla, espera 60 segundos antes de volver a iniciar Chromium.
 
-2. Push:
-   docker login
-   docker push <youruser>/tulotero-proxy:latest
+## Endpoint
 
-3. Use in your stack / Portainer by setting image to `<youruser>/tulotero-proxy:latest` and env var PROXY_KEY to a secret value.
+`GET /resultados` devuelve el sorteo más reciente. `GET /resultados?fecha=<texto>` busca una coincidencia exacta con la fecha mostrada por TuLotero. La respuesta conserva los campos `fecha`, `numeros` y `estrellas`; los números son cadenas de texto.
 
-Endpoint:
-GET /fetch?key=YOUR_KEY (or set header x-api-key)
-
-Returns JSON:
-{ winNums: [n1,..,n5], winStars: [s1,s2], source: 'tulotero' }
+`/health` responde `OK` sin autenticación.
